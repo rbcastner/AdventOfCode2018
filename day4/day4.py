@@ -34,7 +34,8 @@ with open(file_path, 'r') as file:
 			"hour":   int(match_object1.group(4)),
 			"minute": int(match_object1.group(5)),
 			"guard_id": guard_id,
-			"action": action
+			"action": action,
+			"original":line
 		}
 		data.append(row)
 		line = file.readline()
@@ -48,34 +49,38 @@ data["year"] = data["year"] + 500
 data["time"] = pd.to_datetime(data[["year","month","day","hour","minute"]])
 data = data.sort_values(["time"])
 
+data.reset_index()
 # fill in NaN guard numbers
 for index, row in data.iterrows():
 	guard_id = row["guard_id"]
 	if np.isnan(guard_id):
-		data["guard_id"][index] = guard_id_most_recent
+		data.loc[index, "guard_id"] = guard_id_most_recent
 	else:
 		guard_id_most_recent = guard_id
 		
 # resort 		
 data = data.sort_values(["guard_id","time"])
-
+data.reset_index()
+with open(r'C:\Users\Reid\Code\adventofcode\day4\sorted_input.txt', 'w') as file:
+	file.write(data.to_string())
+	
 # CALCULATE number of minutes that each guard is asleep and when they were asleep using ndarray
 # setup first iteration
-guard_ct = 0
 guard_list = []
-guard_dict = {"id":data["guard_id"][0]}
+first_row = data.iloc[0]
+guard_dict = {"id":first_row["guard_id"]}
 asleep = np.zeros(60)
-for index, row in data.iterrows():
+for index, (_, row) in enumerate(data.iterrows()):
 	# reset 
 	if row["guard_id"] != guard_dict["id"]:
 		guard_dict["asleep"] = asleep
 		guard_dict["total_minutes_asleep"] = np.sum(asleep)
 		guard_list.append(guard_dict)
-		guard_dict = {"id":data["guard_id"][0]}
+		guard_dict = {"id":row["guard_id"]}
 		asleep = np.zeros(60)
 	# we only care about the sleeping guards
 	if row["action"] == 0:
-		next_row = data.iloc[index+1,:]
+		next_row = data.iloc[index+1]
 		first_minute = row["minute"]
 		# check if last minute is end of hour
 		if next_row["month"] > row["month"] or next_row["day"] > row["day"] or next_row["guard_id"] != row["guard_id"]:
@@ -90,12 +95,29 @@ for index, row in data.iterrows():
 total_minutes_asleep_max = 0
 total_minutes_asleep_max_index = 0
 for index, dict in enumerate(guard_list):
+	print(dict)
 	if dict["total_minutes_asleep"] > total_minutes_asleep_max :
 		total_minutes_asleep_max = dict["total_minutes_asleep"]
 		total_minutes_asleep_max_index = index
 
 worst_guard = guard_list[total_minutes_asleep_max_index]
 worst_minute = np.argmax(worst_guard["asleep"])
+print("Part one:")
 print(f"Worst Guard ID: {worst_guard['id']}")
 print(f"Worst Minute: {worst_minute}")
 print(f"Answer: {worst_guard['id'] * worst_minute}")
+print("")
+print("Part two:")
+
+max_minute = 0
+for index, dict in enumerate(guard_list):
+	max_minute_guard = np.max(dict["asleep"])
+	if max_minute_guard > max_minute:
+		max_minute = max_minute_guard
+		corresponding_minute = np.argmax(dict["asleep"])
+		corresponding_guard_index = index
+		
+frequent_guard = guard_list[corresponding_guard_index]
+
+print(f"Most Frequent Minute is {corresponding_minute} by Guard #{frequent_guard['id']}")
+print(f"Answer: {corresponding_minute * frequent_guard['id']}")
